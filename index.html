@@ -184,7 +184,7 @@
         const CLIENT_ID = '191548798854-2nfr20gv7o50kbtu2mm482cpipa7vqj8.apps.googleusercontent.com';
         const API_KEY = 'AIzaSyBIaBcHiTR57q2r-xaE2KdG4b_Zxs1xpQY';
         const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
-        const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
+        const SCOPES = 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.metadata.readonly https://www.googleapis.com/auth/drive.file';
         const FOLDER_ID = '1B48bM7Zb-BRP2vIhj4KHuvc4dPj8YYy-';
         
         let tokenClient;
@@ -321,7 +321,8 @@
                         if (file.mimeType.includes('document') || 
                             file.mimeType.includes('spreadsheet') || 
                             file.mimeType.includes('text') ||
-                            file.mimeType.includes('markdown')) {
+                            file.mimeType.includes('markdown') ||
+                            file.mimeType.includes('shortcut')) {
                             
                             try {
                                 const content = await getFileContent(file.id, file.mimeType);
@@ -364,6 +365,20 @@
         
         async function getFileContent(fileId, mimeType) {
             try {
+                // Handle shortcuts by resolving to target
+                if (mimeType.includes('google-apps.shortcut')) {
+                    const fileDetails = await gapi.client.drive.files.get({
+                        fileId: fileId,
+                        fields: 'shortcutDetails'
+                    });
+                    
+                    if (fileDetails.result.shortcutDetails) {
+                        const targetId = fileDetails.result.shortcutDetails.targetId;
+                        const targetMimeType = fileDetails.result.shortcutDetails.targetMimeType;
+                        return await getFileContent(targetId, targetMimeType);
+                    }
+                }
+                
                 let response;
                 if (mimeType.includes('google-apps.document')) {
                     response = await gapi.client.drive.files.export({
