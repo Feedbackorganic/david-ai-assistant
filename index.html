@@ -322,12 +322,12 @@
                         
                         try {
                             const content = await getFileContent(file.id, file.mimeType);
-                            if (content && content.length > 200) {
+                            if (content && content.length > 50) {
                                 const cleanContent = strictCleanContent(content);
-                                if (cleanContent.length > 200 && !containsCode(cleanContent)) {
+                                if (cleanContent.length > 50 && !containsCode(cleanContent)) {
                                     results.push({
                                         name: file.name,
-                                        content: cleanContent.substring(0, 1000),
+                                        content: cleanContent.substring(0, 1500),
                                         relevance: calculateRelevance(query, cleanContent)
                                     });
                                 }
@@ -350,18 +350,16 @@
         function isRealDocument(filename, mimeType) {
             const lowerName = filename.toLowerCase();
             
-            // Exclude ANY technical files
-            const badWords = ['html', 'css', 'js', 'json', 'xml', 'svg', 'php', 'py', 'java', 'cpp', 'david-ai', 'assistant', 'script'];
+            // Exclude only obvious technical files
+            const badWords = ['david-ai', 'assistant', 'script'];
             if (badWords.some(word => lowerName.includes(word))) return false;
             
-            // Only allow real document formats
+            // Allow Google Docs, Sheets, PDFs, and text files
             return mimeType.includes('google-apps.document') || 
+                   mimeType.includes('google-apps.spreadsheet') ||
                    mimeType.includes('text/plain') || 
                    mimeType.includes('pdf') ||
-                   lowerName.includes('meeting') ||
-                   lowerName.includes('minutes') ||
-                   lowerName.includes('board') ||
-                   lowerName.includes('july');
+                   mimeType.includes('application/vnd.openxmlformats');
         }
         
         function containsCode(content) {
