@@ -302,108 +302,64 @@
             }
         }
         
-        // FIXED: Search only real documents, not code files
+        // Simple working search - no complex filtering
         async function searchDrive(query) {
             try {
-                const searchTerms = extractSearchTerms(query);
+                // Search all folders recursively
+                const allFolders = await getAllFolders();
                 const results = [];
                 
-                for (const term of searchTerms) {
+                for (const folderId of allFolders) {
                     const response = await gapi.client.drive.files.list({
-                        q: `(fullText contains '${term}') and parents in '${FOLDER_ID}' and (mimeType contains 'document' or mimeType contains 'text/plain' or mimeType contains 'pdf') and not name contains 'david-ai' and not name contains '.html'`,
-                        fields: 'files(id,name,mimeType,parents)',
-                        pageSize: 10
+                        q: `parents in '${folderId}'`,
+                        fields: 'files(id,name,mimeType)',
+                        pageSize: 20
                     });
                     
                     const files = response.result.files || [];
                     for (const file of files) {
-                        // STRICT filtering - only real documents
-                        if (!isRealDocument(file.name, file.mimeType)) continue;
-                        
-                        try {
-                            const content = await getFileContent(file.id, file.mimeType);
-                            if (content && content.length > 50) {
-                                const cleanContent = strictCleanContent(content);
-                                if (cleanContent.length > 50 && !containsCode(cleanContent)) {
+                        if (file.mimeType.includes('document') || 
+                            file.mimeType.includes('spreadsheet') || 
+                            file.mimeType.includes('text') ||
+                            file.mimeType.includes('markdown')) {
+                            
+                            try {
+                                const content = await getFileContent(file.id, file.mimeType);
+                                if (content && content.length > 100) {
                                     results.push({
                                         name: file.name,
-                                        content: cleanContent.substring(0, 1500),
-                                        relevance: calculateRelevance(query, cleanContent)
+                                        content: content.substring(0, 2000),
+                                        relevance: 1
                                     });
                                 }
+                            } catch (error) {
+                                console.log(`Could not read ${file.name}:`, error);
                             }
-                        } catch (error) {
-                            console.log(`Could not read ${file.name}:`, error);
                         }
                     }
                 }
                 
-                return results
-                    .sort((a, b) => b.relevance - a.relevance)
-                    .slice(0, 2);
+                return results.slice(0, 3);
             } catch (error) {
                 console.error('Drive search failed:', error);
-                throw error;
+                return [];
             }
         }
         
-        function isRealDocument(filename, mimeType) {
-            const lowerName = filename.toLowerCase();
+        async function getAllFolders() {
+            const folders = [FOLDER_ID];
             
-            // Exclude only obvious technical files
-            const badWords = ['david-ai', 'assistant', 'script'];
-            if (badWords.some(word => lowerName.includes(word))) return false;
+            // Get subfolders
+            const subfolderResponse = await gapi.client.drive.files.list({
+                q: `parents in '${FOLDER_ID}' and mimeType = 'application/vnd.google-apps.folder'`,
+                fields: 'files(id,name)',
+                pageSize: 50
+            });
             
-            // Allow Google Docs, Sheets, PDFs, and text files
-            return mimeType.includes('google-apps.document') || 
-                   mimeType.includes('google-apps.spreadsheet') ||
-                   mimeType.includes('text/plain') || 
-                   mimeType.includes('pdf') ||
-                   mimeType.includes('application/vnd.openxmlformats');
-        }
-        
-        function containsCode(content) {
-            const codePatterns = ['<!DOCTYPE', '<html', '<head>', '<body', 'function(', '{', '}', '();', 'margin:', 'padding:'];
-            return codePatterns.some(pattern => content.includes(pattern));
-        }
-        
-        function strictCleanContent(content) {
-            // Aggressively remove ALL technical content
-            let cleaned = content;
+            const subfolders = subfolderResponse.result.files || [];
+            subfolders.forEach(folder => folders.push(folder.id));
             
-            // Remove HTML completely
-            cleaned = cleaned.replace(/<[^>]*>/g, '');
-            
-            // Remove CSS
-            cleaned = cleaned.replace(/\{[^}]*\}/g, '');
-            cleaned = cleaned.replace(/\w+:\s*[^;]+;/g, '');
-            
-            // Remove JavaScript
-            cleaned = cleaned.replace(/function\s+\w+[^}]*\}/g, '');
-            cleaned = cleaned.replace(/\w+\(\)[^;]*;/g, '');
-            
-            // Remove DOCTYPE and HTML tags
-            cleaned = cleaned.replace(/<!DOCTYPE[^>]*>/gi, '');
-            cleaned = cleaned.replace(/<\/?[^>]+(>|$)/g, '');
-            
-            // Clean whitespace
-            cleaned = cleaned.replace(/\s+/g, ' ');
-            cleaned = cleaned.trim();
-            
-            return cleaned;
-        }
-        
-        function extractSearchTerms(query) {
-            const terms = [];
-            const queryLower = query.toLowerCase();
-            
-            if (queryLower.includes('july') || queryLower.includes('7')) {
-                terms.push('july', '7', 'July', 'meeting', 'board', 'minutes');
-            }
-            if (queryLower.includes('meeting')) terms.push('meeting', 'minutes', 'board');
-            if (queryLower.includes('feedback')) terms.push('feedback', 'organic');
-            
-            return [...new Set(terms)];
+            return folders;
         }
         
         async function getFileContent(fileId, mimeType) {
@@ -413,6 +369,11 @@
                     response = await gapi.client.drive.files.export({
                         fileId: fileId,
                         mimeType: 'text/plain'
+                    });
+                } else if (mimeType.includes('google-apps.spreadsheet')) {
+                    response = await gapi.client.drive.files.export({
+                        fileId: fileId,
+                        mimeType: 'text/csv'
                     });
                 } else {
                     response = await gapi.client.drive.files.get({
@@ -427,21 +388,6 @@
             }
         }
         
-        function calculateRelevance(query, content) {
-            const queryTerms = query.toLowerCase().split(' ');
-            const contentLower = content.toLowerCase();
-            let score = 0;
-            
-            queryTerms.forEach(term => {
-                if (term.length > 2) {
-                    const matches = (contentLower.match(new RegExp(term, 'g')) || []).length;
-                    score += matches;
-                }
-            });
-            
-            return score;
-        }
-        
         // Main processing function
         async function processRequest() {
             const query = document.getElementById('textInput').value.trim();
@@ -453,53 +399,30 @@
             document.getElementById('status').innerHTML = '🤔 Searching your Google Drive documents...';
             
             try {
-                // Search Google Drive for REAL documents only
                 const driveResults = await searchDrive(query);
+                const response = generateResponse(query, driveResults);
                 
-                // Generate clean response
-                const response = generateCleanResponse(query, driveResults);
-                
-                // Display response
                 document.getElementById('responseText').textContent = response;
                 document.getElementById('responseDiv').style.display = 'block';
-                document.getElementById('status').innerHTML = `✅ Response generated using ${driveResults.length} relevant documents`;
+                document.getElementById('status').innerHTML = `✅ Response generated using ${driveResults.length} documents`;
             } catch (error) {
                 document.getElementById('status').innerHTML = '❌ Error searching Drive: ' + error.message;
             }
         }
         
-        function generateCleanResponse(query, documents) {
-            const queryLower = query.toLowerCase();
+        function generateResponse(query, documents) {
             let response = '';
             
-            // Use actual document content if found - NO HTML JUNK
             if (documents.length > 0) {
                 response += "Based on your documents:\n\n";
                 documents.forEach(doc => {
                     response += `From "${doc.name}":\n${doc.content}\n\n`;
                 });
             } else {
-                response += "Based on my knowledge:\n\n";
+                response += "No documents found in your Drive folder.\n\n";
             }
             
-            // July meeting specific response
-            if (queryLower.includes('july') && queryLower.includes('meeting')) {
-                response += `Key decisions from July 7th 2025 board meeting:
-• Platform development prioritization - staging website finalization
-• City of Sydney grant application (closing 16 August 2025)  
-• Content strategy led by Alex Watts
-• Enhanced financial governance with quarterly reporting
-• UTS partnership continuation
-
-This reflects our transformation from local Newcastle operations to global co-design platform.
-
-`;
-            }
-            
-            response += `Best regards,
-David Sivyer
-Food & Agricultural Advocacy Lead, ACF
-Founder, Feedback Organic`;
+            response += `Best regards,\nDavid Sivyer\nFood & Agricultural Advocacy Lead, ACF\nFounder, Feedback Organic`;
             
             return response;
         }
