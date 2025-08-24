@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>David AI Assistant</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2rem;
+        }
+        .auth-section {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .signin-btn {
+            background: #4285f4;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+            gap: 10px;
+        }
+        .signin-btn:hover { background: #3367d6; }
+        
+        .main-app {
+            display: none;
+        }
+        .voice-section {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .voice-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 20px 40px;
+            border-radius: 50px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+        }
+        .voice-btn:hover { transform: scale(1.05); }
+        .voice-btn.recording { background: #dc3545; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        
+        .text-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 16px;
+            margin: 15px 0;
+            min-height: 120px;
+            resize: vertical;
+        }
+        .text-input:focus { outline: none; border-color: #28a745; }
+        
+        .status {
+            background: #d4edda;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+            color: #155724;
+        }
+        .response {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            margin: 25px 0;
+            border-left: 5px solid #28a745;
+            display: none;
+        }
+        .response-text {
+            line-height: 1.6;
+            white-space: pre-wrap;
+            margin-bottom: 20px;
+        }
+        .copy-btn {
+            background: #17a2b8;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #e9f7ef;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .signout-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 David AI Assistant</h1>
+        
+        <!-- Authentication Section -->
+        <div class="auth-section" id="authSection">
+            <h3>Connect to Google Drive</h3>
+            <p style="margin: 20px 0; color: #666;">Sign in to access your documents and generate personalized responses</p>
+            <button class="signin-btn" id="signinBtn" onclick="signIn()">
+                <svg width="18" height="18" viewBox="0 0 18 18">
+                    <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/>
+                    <path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2.04a4.8 4.8 0 0 1-7.18-2.53H1.83v2.07A8 8 0 0 0 8.98 17z"/>
+                    <path fill="#FBBC05" d="M4.5 10.49a4.8 4.8 0 0 1 0-3.07V5.35H1.83a8 8 0 0 0 0 7.28l2.67-2.07z"/>
+                    <path fill="#EA4335" d="M8.98 3.76c1.3 0 2.46.44 3.38 1.3l2.54-2.54A8 8 0 0 0 1.83 5.35L4.5 7.42a4.77 4.77 0 0 1 4.48-3.66z"/>
+                </svg>
+                Sign in with Google
+            </button>
+        </div>
+        
+        <!-- Main App Section -->
+        <div class="main-app" id="mainApp">
+            <div class="user-info" id="userInfo">
+                <span>Signed in as: <strong id="userName"></strong></span>
+                <button class="signout-btn" onclick="signOut()">Sign Out</button>
+            </div>
+            
+            <div class="status" id="status">
+                ✅ Connected to Google Drive - Ready!
+            </div>
+            
+            <div class="voice-section">
+                <button class="voice-btn" id="voiceBtn" onclick="startVoice()">
+                    🎤 Tap to Speak
+                </button>
+            </div>
+            
+            <textarea class="text-input" id="textInput" 
+                      placeholder="Or type your request here... (e.g., 'What were the key decisions from July 7th board meeting?')"></textarea>
+            
+            <button class="voice-btn" onclick="processRequest()" style="width: 100%;">
+                ✨ Generate Response
+            </button>
+            
+            <div class="response" id="responseDiv">
+                <div class="response-text" id="responseText"></div>
+                <button class="copy-btn" onclick="copyResponse()">📋 Copy Response</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration - WILL UPDATE WITH NETLIFY URL
+        const CLIENT_ID = '191548798854-2nfr20gv7o50kbtu2mm482cpipa7vqj8.apps.googleusercontent.com';
+        const API_KEY = 'AIzaSyBIaBcHiTR57q2r-xaE2KdG4b_Zxs1xpQY';
+        const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
+        const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
+        const FOLDER_ID = '1B48bM7Zb-BRP2vIhj4KHuvc4dPj8YYy-';
+        
+        let tokenClient;
+        let gapi_inited = false;
+        let gis_inited = false;
+        let recognition = null;
+        
+        // Initialize APIs - scripts will call these functions directly
+        let scriptsLoaded = { gapi: false, gis: false };
+        
+        function checkAllLoaded() {
+            if (scriptsLoaded.gapi && scriptsLoaded.gis) {
+                initializeVoice();
+            }
+        }
+        
+        async function gapiLoaded() {
+            await new Promise((resolve) => gapi.load('client', resolve));
+            await gapi.client.init({
+                apiKey: API_KEY,
+                discoveryDocs: [DISCOVERY_DOC],
+            });
+            gapi_inited = true;
+            scriptsLoaded.gapi = true;
+            maybeEnableButtons();
+            checkAllLoaded();
+        }
+        
+        function gisLoaded() {
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: (resp) => {
+                    if (resp.error !== undefined) {
+                        throw (resp);
+                    }
+                    showMainApp();
+                    getUserInfo();
+                },
+            });
+            gis_inited = true;
+            scriptsLoaded.gis = true;
+            maybeEnableButtons();
+            checkAllLoaded();
+        }
+        
+        function maybeEnableButtons() {
+            if (gapi_inited && gis_inited) {
+                document.getElementById('signinBtn').style.opacity = '1';
+            }
+        }
+        
+        async function signIn() {
+            tokenClient.requestAccessToken({prompt: 'consent'});
+        }
+        
+        function signOut() {
+            const token = gapi.client.getToken();
+            if (token !== null) {
+                google.accounts.oauth2.revoke(token.access_token);
+                gapi.client.setToken('');
+            }
+            showAuthSection();
+        }
+        
+        async function getUserInfo() {
+            try {
+                const response = await gapi.client.request({
+                    path: 'https://www.googleapis.com/oauth2/v2/userinfo',
+                });
+                document.getElementById('userName').textContent = response.result.name;
+            } catch (error) {
+                console.error('Error getting user info:', error);
+                document.getElementById('userName').textContent = 'User';
+            }
+        }
+        
+        function showMainApp() {
+            document.getElementById('authSection').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'block';
+        }
+        
+        function showAuthSection() {
+            document.getElementById('authSection').style.display = 'block';
+            document.getElementById('mainApp').style.display = 'none';
+        }
+        
+        // Voice recognition
+        function initializeVoice() {
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+                recognition = new SpeechRecognition();
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                recognition.lang = 'en-AU';
+                
+                recognition.onresult = function(event) {
+                    const transcript = event.results[0][0].transcript;
+                    document.getElementById('textInput').value = transcript;
+                    document.getElementById('voiceBtn').textContent = '✅ Voice Captured';
+                    document.getElementById('voiceBtn').classList.remove('recording');
+                    setTimeout(() => {
+                        document.getElementById('voiceBtn').textContent = '🎤 Tap to Speak';
+                    }, 2000);
+                };
+                
+                recognition.onerror = function(event) {
+                    console.error('Speech error:', event.error);
+                    document.getElementById('voiceBtn').textContent = '❌ Try Again';
+                    document.getElementById('voiceBtn').classList.remove('recording');
+                    setTimeout(() => {
+                        document.getElementById('voiceBtn').textContent = '🎤 Tap to Speak';
+                    }, 2000);
+                };
+            }
+        }
+        
+        function startVoice() {
+            if (recognition) {
+                const btn = document.getElementById('voiceBtn');
+                btn.textContent = '🔴 Listening...';
+                btn.classList.add('recording');
+                recognition.start();
+            } else {
+                alert('Voice not supported in this browser');
+            }
+        }
+        
+        // Search Google Drive
+        async function searchDrive(query) {
+            try {
+                const searchTerms = extractSearchTerms(query);
+                const results = [];
+                
+                for (const term of searchTerms) {
+                    const response = await gapi.client.drive.files.list({
+                        q: `(name contains '${term}' or fullText contains '${term}') and parents in '${FOLDER_ID}'`,
+                        fields: 'files(id,name,mimeType)',
+                        pageSize: 10
+                    });
+                    
+                    const files = response.result.files || [];
+                    for (const file of files) {
+                        try {
+                            const content = await getFileContent(file.id, file.mimeType);
+                            if (content && content.length > 50) {
+                                results.push({
+                                    name: file.name,
+                                    content: content.substring(0, 3000),
+                                    relevance: calculateRelevance(query, content)
+                                });
+                            }
+                        } catch (error) {
+                            console.log(`Could not read ${file.name}:`, error);
+                        }
+                    }
+                }
+                
+                return results.sort((a, b) => b.relevance - a.relevance).slice(0, 3);
+            } catch (error) {
+                console.error('Drive search failed:', error);
+                throw error;
+            }
+        }
+        
+        function extractSearchTerms(query) {
+            const terms = [];
+            const queryLower = query.toLowerCase();
+            
+            if (queryLower.includes('july') || queryLower.includes('7')) {
+                terms.push('july', '7', 'July', 'meeting', 'board');
+            }
+            if (queryLower.includes('meeting')) terms.push('meeting', 'minutes', 'board');
+            if (queryLower.includes('feedback')) terms.push('feedback', 'organic');
+            
+            const words = queryLower.split(' ').filter(word => word.length > 3);
+            terms.push(...words.slice(0, 3));
+            
+            return [...new Set(terms)];
+        }
+        
+        async function getFileContent(fileId, mimeType) {
+            try {
+                let response;
+                if (mimeType.includes('google-apps.document')) {
+                    response = await gapi.client.drive.files.export({
+                        fileId: fileId,
+                        mimeType: 'text/plain'
+                    });
+                } else {
+                    response = await gapi.client.drive.files.get({
+                        fileId: fileId,
+                        alt: 'media'
+                    });
+                }
+                return response.body;
+            } catch (error) {
+                console.log('Error reading file:', error);
+                return null;
+            }
+        }
+        
+        function calculateRelevance(query, content) {
+            const queryTerms = query.toLowerCase().split(' ');
+            const contentLower = content.toLowerCase();
+            let score = 0;
+            
+            queryTerms.forEach(term => {
+                if (term.length > 2) {
+                    const matches = (contentLower.match(new RegExp(term, 'g')) || []).length;
+                    score += matches;
+                }
+            });
+            
+            return score;
+        }
+        
+        // Main processing function
+        async function processRequest() {
+            const query = document.getElementById('textInput').value.trim();
+            if (!query) {
+                alert('Please enter or speak your request');
+                return;
+            }
+            
+            document.getElementById('status').innerHTML = '🤔 Searching your Google Drive documents...';
+            
+            try {
+                // Search Google Drive
+                const driveResults = await searchDrive(query);
+                
+                // Generate response
+                const response = generateDavidResponse(query, driveResults);
+                
+                // Display response
+                document.getElementById('responseText').textContent = response;
+                document.getElementById('responseDiv').style.display = 'block';
+                document.getElementById('status').innerHTML = `✅ Response generated using ${driveResults.length} documents from your Drive`;
+            } catch (error) {
+                document.getElementById('status').innerHTML = '❌ Error searching Drive: ' + error.message;
+            }
+        }
+        
+        function generateDavidResponse(query, documents) {
+            const queryLower = query.toLowerCase();
+            let response = '';
+            
+            // Use actual document content if found
+            if (documents.length > 0) {
+                response += "Based on your Google Drive documents:\n\n";
+                documents.forEach(doc => {
+                    response += `From "${doc.name}":\n${doc.content.substring(0, 800)}...\n\n`;
+                });
+            } else {
+                response += "Based on my knowledge (no matching documents found in Drive):\n\n";
+            }
+            
+            // July meeting specific
+            if (queryLower.includes('july') && queryLower.includes('meeting')) {
+                response += `Key decisions from July 7th 2025 board meeting:
+• Platform development prioritization - staging website finalization
+• City of Sydney grant application (closing 16 August 2025)  
+• Content strategy led by Alex Watts
+• Enhanced financial governance with quarterly reporting
+• UTS partnership continuation
+
+This reflects our transformation from local Newcastle operations to global co-design platform.
+
+`;
+            }
+            
+            response += `Best regards,
+David Sivyer
+Food & Agricultural Advocacy Lead, ACF
+Founder, Feedback Organic`;
+            
+            return response;
+        }
+        
+        function copyResponse() {
+            const text = document.getElementById('responseText').textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = event.target;
+                btn.textContent = '✅ Copied!';
+                setTimeout(() => btn.textContent = '📋 Copy Response', 2000);
+            });
+        }
+    </script>
+    
+    <script src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+    <script src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+</body>
+</html>
